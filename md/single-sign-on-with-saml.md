@@ -68,6 +68,7 @@ To configure Bonita for SAML:
        -->  auth.AuthenticationManager = org.bonitasoft.console.common.server.auth.impl.saml.SAML2AuthenticationManagerImpl
        -->  saml.filter.active = true
        -->  saml.auth.standard.allowed = false
+       -->  saml.logout.global = false
        -->  auth.tenant.admin.username = install
        -->  auth.passphrase = BonitaBPM
             #auth.AuthenticationManager = org.bonitasoft.console.common.server.auth.impl.oauth.OAuthAuthenticationManagerImpl
@@ -167,7 +168,6 @@ For example on linux, you can use the command ssh-keygen, then go to “cd ~/.ss
        <keycloak-saml-adapter>
            <SP entityID="bonita"
                sslPolicy="EXTERNAL"
-               logoutPage="http://localhost:8080/bonita/logoutservice"
                forceAuthentication="false"
                isPassive="false"
                turnOffChangeSessionIdOnLogin="true">
@@ -206,8 +206,8 @@ Then you can try to access a portal page, an app page or a form URL (or just `ht
 Note that if you try to access `http://<bundle host>:<port>/bonita/login.jsp`, then you won't be redirected as this page still needs to be accessible in order for the tenant administrator (or another user if you set the property `saml.auth.standard.allowed` to true) to be able to log in without an account on the Identity Provider.
 
 ::: info
-**Note 1:** The single logout SAML profile is not supported by bonita as it doesn't work the same way for each IdP.  
-So the SingleLogoutService configuration is not used (but the element still needs to be present in order for the filter to work...).  
+**Note 1:** The Single Logout SAML profile is only provided as an experimental feature as it doesn't work the same way for each IdP.  
+Single logout has only been tested with a Keycloack server acting as SAML Identity Provider.   
 :::
 
 ::: info
@@ -247,18 +247,29 @@ com.bonitasoft.level = ALL
 
 ## Configure logout behaviour
 
-#### Bonita Portal
-
 When your Bonita platform is configured to manage authentication over SAML, when users log out of Bonita Portal, they do not log out of the SAML Identity Provider (IdP).  
 Therefore they are not logged out of all applications that are using the IdP.  
-To avoid this, you can hide the logout option of the portal.  
-To do this, set the `logout.link.hidden=true` option in `authenticationManager-config.properties` located in `platform_conf/initial/tenant_template_portal` 
-for not initialized platform or `platform_conf/current/tenant_template_portal` and `platform_conf/current/tenants/[TENANT_ID]/tenant_portal/`.
+To avoid this, you have two options :  
+
+#### Hide the logout button of the portal
+
+This is the most commonly used solution.  
+To do this, set the `logout.link.hidden` option to `true` in `authenticationManager-config.properties` located in `platform_conf/initial/tenant_template_portal` for not initialized platform or `platform_conf/current/tenant_template_portal` and `platform_conf/current/tenants/[TENANT_ID]/tenant_portal/`.
 
 ::: info
 **Note:** When a user logs out from the IdP, Bonita Portal's session will remain active. The user's session time to live will be reset 
-to the configured session timeout value upon each user interaction with the server.
+to the configured session timeout value upon each user interaction with the server.  
 :::
+
+#### Setup Bonita platform for SAML global logout
+
+Global logout allows to log out from the Identity provider as well as all the registered service providers when logging out from Bonita platform. This is sometimes required for example if users are on public computers.  
+As Identity providers do not necessarily support single logout and have different ways of handling it (there are several SAML Single Logout methods), Bonita only offers SAML global logout as an experimental feature. Meaning that this feature has only been tested with Keycloack server acting as Identity provider.  
+Therefore, there is no guaranty that global logout will work with your Identity provider. However, if it supports the service provider initiated flow of the Web Browser Single Logout profile, it is likely to work.  
+To setup Bonita for global logout:
+1. Set the `saml.logout.global` option to `true` in `authenticationManager-config.properties` located in `platform_conf/initial/tenant_template_portal` for not initialized platform or `platform_conf/current/tenant_template_portal` and `platform_conf/current/tenants/[TENANT_ID]/tenant_portal/`.
+2. Update the SingleLogoutService section of `keycloak-saml.xml` located in `platform_conf/initial/tenant_template_portal` for not initialized platform or `platform_conf/current/tenant_template_portal` and `platform_conf/current/tenants/[TENANT_ID]/tenant_portal/` to match your Identity provider configuration.
+3. Update your Identity provider configuration to setup the Logout Service POST/Redirect Binding URL to <Bonita_server_URL>/bonita/samlLogout  
 
 ## Manage passwords
 
@@ -289,6 +300,7 @@ Here is the subset of pages filtered by the SAML filter:
 * /portal/form/\*
 * /mobile/\*
 * /apps/\*
+* /logoutservice
 
 REST API are not part of them, but if an http session already exists thanks to cookies, REST API can be used.
 
